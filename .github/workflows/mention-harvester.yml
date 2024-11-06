@@ -6,7 +6,7 @@ on:
 
 jobs:
   mention-harvester:
-    if: startsWith(github.event.comment.body, '/harvester smoke') && github.event.comment.author_association == 'COLLABORATOR'
+    if: startsWith(github.event.comment.body, '/harvester smoke')
     runs-on: ubuntu-latest
 
     steps:
@@ -15,11 +15,15 @@ jobs:
         with:
           script: |
             const octokit = github.getOctokit(core.getInput('token'));
+            const issue_number = context.issue.number;
             const response = await octokit.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'another-workflow.yml',
-              ref: context.payload.pull_request.head.ref
+              ref: context.payload.pull_request.head.ref,
+              inputs: {
+              issue_number: issue_number
+              }
             });
         env:
           token: ${{ secrets.GITHUB_TOKEN }}
