@@ -11,6 +11,7 @@ In addition to traditional virtual machines (VMs), Harvester supports containeri
 
 ![harvester-ui](./docs/assets/dashboard.png)
 
+
 ## Overview
 Harvester is an enterprise-ready, easy-to-use infrastructure platform that leverages local, direct attached storage instead of complex external SANs. It utilizes Kubernetes API as a unified automation language across container and VM workloads. Some key features of Harvester include:
 
