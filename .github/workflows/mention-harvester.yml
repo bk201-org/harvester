@@ -1,0 +1,13 @@
+name: Mention Harvester
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  mention-harvester:
+    if: startsWith(github.event.comment.body, '/harvester smoke')
+    uses: ./.github/workflows/another-workflow.yml
+    with:
+      issue_number: ${{ github.event.issue.number }}
+    secrets: inherit
