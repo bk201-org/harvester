@@ -6,7 +6,7 @@ on:
 
 jobs:
   mention-harvester:
-    if: contains(github.event.comment.body, '/harvester smoke')
+    if: contains(github.event.comment.body, '/harvester smoke') and ${{ github.event.issue.pull_request }} and github.event.comment.author_association == 'MEMBER'
     uses: ./.github/workflows/another-workflow.yml
     with:
       issue_number: ${{ github.event.issue.number }}
