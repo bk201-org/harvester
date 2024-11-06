@@ -6,7 +6,7 @@ on:
 
 jobs:
   mention-harvester:
-    if: startsWith(github.event.comment.body, '/harvester smoke')
+    if: startsWith(github.event.comment.body.trim(), '/harvester smoke')
     uses: ./.github/workflows/another-workflow.yml
     with:
       issue_number: ${{ github.event.issue.number }}

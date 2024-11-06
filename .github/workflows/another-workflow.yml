@@ -13,6 +13,8 @@ jobs:
         - run: echo "smoke on the pull request ${{ inputs.issue_number }}"
   post-comment:
     needs: do-something
+    permissions:
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Post comment on PR
