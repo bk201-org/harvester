@@ -1,6 +1,6 @@
 name: another workflow
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       issue_number:
         required: true
