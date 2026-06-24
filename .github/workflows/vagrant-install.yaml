@@ -3,6 +3,20 @@ name: Vagrant install
 on:
   pull_request:
     types: [opened, reopened, synchronize]
+    paths:
+      - 'ci/**'
+      - 'cmd/installer/**'
+      - 'pkg/installer/**'
+      - 'vendor/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/**'
+      - '!scripts/*.txt'
+      - '!scripts/build'
+      - '!scripts/generate-*'
+      - '!scripts/package-*'
+      - '!scripts/test-*'
+      - '!scripts/validate-*'
   push:
     branches:
       - master
@@ -13,6 +27,7 @@ on:
 env:
   LIBVIRT_DEFAULT_URI: "qemu:///system"
   KEEP_ENV_WHEN_FAILURE: ${{ secrets.KEEP_CI_FAILURE }}
+  REGISTRY: "172.17.0.1:5000"
 
 jobs:
   main:
@@ -24,8 +39,13 @@ jobs:
       - name: Build Harvester artifacts
         env:
           DISABLE_BUILD_NET_INSTALL_ISO: "true"
+          REPO: ${{ env.REGISTRY }}/rancher
+          PUSH: "true"
         run: |
-          make
+          # image tags are determined from the branch name
+          git checkout -b vagrant-run${{ github.run_number }}-${{ github.run_attempt }}
+          make package-all
+          make build-iso
       - name: Clone and checkout ipxe-examples
         id: ipxe
         run: |
@@ -52,10 +72,11 @@ jobs:
           yq e -i ".harvester_config.ssh_authorized_keys += [ strenv(PUB_KEY) ]" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
       - name: Set artifacts in ipxe-examples settings
         run: |
-          yq e -i ".harvester_iso_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-master-amd64.iso\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
-          yq e -i ".harvester_kernel_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-master-vmlinuz-amd64\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
-          yq e -i ".harvester_ramdisk_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-master-initrd-amd64\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
-          yq e -i ".harvester_rootfs_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-master-rootfs-amd64.squashfs\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
+          source ./scripts/version
+          yq e -i ".harvester_iso_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-${VERSION}-amd64.iso\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
+          yq e -i ".harvester_kernel_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-${VERSION}-vmlinuz-amd64\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
+          yq e -i ".harvester_ramdisk_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-${VERSION}-initrd-amd64\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
+          yq e -i ".harvester_rootfs_url = \"file://${{ github.workspace }}/dist/artifacts/harvester-${VERSION}-rootfs-amd64.squashfs\"" ${{ steps.ipxe.outputs.VAGRANT_HOME }}/settings.yml
       - name: Setup cluster
         working-directory: ${{ steps.ipxe.outputs.VAGRANT_HOME }}
         run: |
