@@ -22,7 +22,8 @@ jobs:
       id: set_vars
       run: |
         echo "sha_short=$(git rev-parse --short=8 "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
-        echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_OUTPUT"
+        # echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_OUTPUT"
+        echo "branch=master" >> "$GITHUB_OUTPUT"
 
   calling-build-factory:
     needs: configure_input_vars
