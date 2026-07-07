@@ -18,16 +18,27 @@ on:
           required: false
           default: false
           type: boolean
-
+        artifact_server_url:
+          required: false
+          default: "http://172.17.0.1:8787"
+          type: string
+        harvester_tests_repo:
+          required: false
+          default: "https://github.com/harvester/tests"
+          type: string
+        test_tags:
+          required: false
+          default: "pr-baseline"
+          type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/v') && !startsWith(github.ref, 'refs/tags/v') }}
 jobs:
   build-push-images:
-    # if: false
     name: Build and push images
-    runs-on: [self-hosted, e2e, harvester-dev]
+    runs-on:
+      group: e2e-ci
     strategy:
       matrix:
         arch: [x64]
@@ -143,7 +154,8 @@ jobs:
 
   run-e2e-tests:
     name: Run E2E tests
-    runs-on: [self-hosted, e2e, harvester-dev]
+    runs-on:
+      group: e2e-ci
     needs: build-push-images
     strategy:
       matrix:
@@ -170,9 +182,8 @@ jobs:
     - name: Create testing cluster
       run: |
         cd $HOME/harvester-dev
-        task op:nodes-destroy
-        # task op:nodes-golden-restore-and-boot -- ${{ env.target_branch }}
-        task op:nodes-golden-restore-and-boot -- master
+        # ./scripts/golden-prepare.sh "${{ inputs.artifact_server_url }}/isos/golden" "${{ env.target_branch }}"
+        ./scripts/golden-prepare.sh "${{ inputs.artifact_server_url }}/isos/golden" master
       env:
         LIBVIRT_DEFAULT_URI: "qemu:///system"
 
@@ -210,10 +221,8 @@ jobs:
       run: |
         echo "Running E2E tests"
 
-        set -x
-
-        # todo: clone
-        cd $HOME/tests/harvester_robot_tests
+        git clone "${{ inputs.harvester_tests_repo }}" qa-tests
+        cd qa-tests/harvester_robot_tests/
 
         cat > .env <<EOF
         HARVESTER_OPERATION_STRATEGY="crd"
@@ -221,10 +230,10 @@ jobs:
         HARVESTER_USERNAME="admin"
         HARVESTER_PASSWORD="$(yq -e '.harvester.admin_password' $HOME/harvester-dev/config.yaml)"
 
-        OPENSUSE_IMAGE_URL="$(yq -e '.artifact_server_url' $HOME/harvester-dev/config.yaml)/images/openSUSE-Leap-15.6.x86_64-NoCloud.qcow2"
+        OPENSUSE_IMAGE_URL="${{ inputs.artifact_server_url }}/images/openSUSE-Leap-15.6.x86_64-NoCloud.qcow2"
         EOF
 
-        ./docker-run.sh --kubeconfig "$HOME/harvester-dev/kubeconfig" --output "${{ env.test_results_dir }}" -- -p 8 -i pr-baseline
+        ./docker-run.sh --kubeconfig "$HOME/harvester-dev/kubeconfig" --output "${{ env.test_results_dir }}" -- -p 8 -i ${{ inputs.test_tags }}
     
     - name: Upload test results
       if: always()
