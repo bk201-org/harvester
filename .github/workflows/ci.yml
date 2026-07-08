@@ -1,0 +1,101 @@
+name: CI
+
+# Stage 2 of a two-stage PR CI pattern (see bot/design_docs/workflow.md).
+#
+# `workflow_run` always loads THIS file from the default branch, regardless
+# of what a PR's fork contains — that's the trust boundary. Secrets and
+# write permissions only ever live here, never in Stage 1
+# (.github/workflows/pr-receiver.yml).
+#
+# Every value this job acts on is sourced from GitHub's own workflow_run
+# event/API data, never from anything Stage 1's code produced (there is no
+# artifact hand-off at all), so a rewritten Stage 1 workflow cannot forge
+# the commit this job checks out or reports status against.
+
+on:
+  workflow_run:
+    workflows: ["PR Receiver"]
+    types: [completed]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  run-ci:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve trusted PR context
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        run: |
+          echo "HEAD_SHA=$HEAD_SHA"   >> "$GITHUB_ENV"
+          echo "HEAD_REPO=$HEAD_REPO" >> "$GITHUB_ENV"
+
+      - name: Look up the PR number for this commit (independently, via API)
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: process.env.HEAD_SHA,
+            });
+            if (!data.length) core.setFailed("No PR found for this commit");
+            core.exportVariable('PR_NUMBER', String(data[0].number));
+
+      # Register a Check Run against the trusted SHA so this shows up in the
+      # PR's native "Checks" list (and can later be made a required status
+      # check) — a workflow_run job isn't attached to a PR's check list
+      # automatically the way a pull_request job is.
+      - name: Start check run
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const { data } = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'CI',
+              head_sha: process.env.HEAD_SHA,
+              status: 'in_progress',
+            });
+            core.exportVariable('CHECK_RUN_ID', String(data.id));
+
+      - name: Checkout PR code at the trusted SHA
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          # Untrusted code below this point — do not persist a token it
+          # could use to push or act as this identity.
+          persist-credentials: false
+
+      # --- From here, workflow code is from the default branch. PR code is
+      #     only data, and every value used above came from GitHub's own
+      #     run/commit records, never from Stage 1's own output. ---
+
+      # TODO: replace with the real CI steps, e.g.:
+      #   - run: make validate
+      #   - run: make test
+      - name: Run CI (placeholder)
+        run: |
+          echo "TODO: run real validate/test/build steps here"
+
+      - name: Complete check run
+        if: always()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const conclusion = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.checks.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_run_id: process.env.CHECK_RUN_ID,
+              status: 'completed',
+              conclusion,
+              output: {
+                title: conclusion === 'success' ? 'CI passed' : 'CI failed',
+                summary: `Ran against ${process.env.HEAD_SHA}`,
+              },
+            });

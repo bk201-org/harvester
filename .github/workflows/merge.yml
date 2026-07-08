@@ -1,0 +1,32 @@
+name: Post-Merge
+
+# Stage 3 of a two-stage(+) PR CI pattern (see bot/design_docs/workflow.md).
+#
+# Triggered by pushes to protected branches, which only maintainers can do,
+# so this workflow's code is inherently trusted — no fork-controlled input
+# is involved. This is currently a stub: it does not build, test, or
+# publish anything yet. Reviving the previous release pipeline (image
+# push, ISO build/upload — see .github/workflows/build-factory.yml.bak) is
+# a separate, larger effort and intentionally not part of this stub.
+
+on:
+  push:
+    branches:
+      - master
+      - "release-*"
+
+permissions:
+  contents: read
+
+jobs:
+  post-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # TODO: replace with the real post-merge steps, e.g.:
+      #   - run: make validate
+      #   - run: make test
+      - name: Run post-merge checks (placeholder)
+        run: |
+          echo "TODO: run real validate/test/build steps here"

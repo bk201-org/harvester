@@ -1,0 +1,22 @@
+name: PR Receiver
+
+# Stage 1 of a two-stage PR CI pattern (see bot/design_docs/workflow.md).
+#
+# This workflow's YAML is read from the PR's own head ref (the fork), so a
+# contributor can rewrite it to say anything at all. Treat it as fully
+# attacker-controlled: no secrets, no privileged actions, nothing here is
+# ever trusted by Stage 2 (.github/workflows/ci.yml). Its only job is to
+# exist as a `workflow_run` trigger point that Stage 2 (which is always
+# loaded from the default branch, not the fork) reacts to.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: echo "PR opened/updated — CI runs separately via workflow_run from the default branch"
